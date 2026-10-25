@@ -1,4 +1,5 @@
 
+
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
@@ -212,7 +213,14 @@ int alloc_term(int id, Term term)
 
 void parse_spaces(void)
 {
-    while (isspace(input[pos])) {
+    while (1) {
+        if (!strncmp(input+pos, "//", 2)) {
+            pos += 2;
+            while (input[pos] != '\n') ++pos;
+            continue;
+        }
+
+        if (!isspace(input[pos])) break;
         ++pos;
     }
 }

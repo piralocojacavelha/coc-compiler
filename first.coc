@@ -1,0 +1,115 @@
+
+Int: Type;
+Bool: Type;
+String: Type;
+
+Unit: Type;
+unit: Unit;
+identity: Unit -> (Result: Type) -> Result -> Result;
+
+
+Maybe: Type -> Type;
+
+nothing: (Value: Type) -> Maybe Value;
+just: (Value: Type) -> Value -> Maybe Value;
+
+unwrap: (Value: Type) -> Maybe Value ->
+    (Result: Type) -> (Value -> Result) -> Result -> Result;
+
+
+Subtype: (Value: Type) -> (Value -> Type) -> Type;
+packWitness: (Value: Type) -> (Property: Value -> Type) ->
+    (value: Value) -> Property value -> Subtype Value Property;
+
+unpackWitness: (Value: Type) -> (Property: Value -> Type) ->   
+    Subtype Value Property ->
+    (Result: Type) -> ((value: Value) -> Property value -> Result) -> Result;
+
+Pair: Type -> Type -> Type;
+pack: (Left: Type) -> (Right: Type) -> Left -> Right -> Pair Left Right;
+unpack: (Left: Type) -> (Right: Type) -> Pair Left Right ->
+    (Result: Type) -> (Left -> Right -> Result) -> Result;
+
+World: Type;
+IO: Type -> Type;
+IO = \A: Type. World -> Pair A World;
+
+pure: (A: Type) -> A -> IO A;
+pure = \A: Type. \x: A. \w: World. pack A World x w;
+
+FileHandle: Type;
+IsFile: FileHandle -> Type;
+
+File: Type;
+File = Subtype FileHandle IsFile;
+
+unpackFile: File ->
+    (Result: Type) -> ((h: FileHandle) -> IsFile h -> Result) -> Result;
+
+unpackFile = unpackWitness FileHandle IsFile;
+
+openFile: String -> IO (Maybe File);
+readFile: File -> IO (Maybe String);
+
+printString: String -> IO Unit;
+
+unpackIO =
+    \A: Type.
+    unpack A World;
+
+packIO =
+    \A: Type.
+    pack A World;
+
+chainIOMaybe: (A: Type) -> (B: Type) ->
+    (A -> IO (Maybe B)) -> IO (Maybe A) -> IO (Maybe B);
+chainIOMaybe =
+    \A: Type.
+    \B: Type.
+    \f: A -> IO (Maybe B).
+    \io: IO (Maybe A).
+    \world: World.
+    unpackIO (Maybe A) (io world) (Pair (Maybe B) World)
+        (\maybe: Maybe A. \world: World.
+            unwrap A maybe (Pair (Maybe B) World)
+                (\value: A. f value world)
+                (packIO (Maybe B) (nothing B) world));
+
+chainIO: (A: Type) -> (B: Type) ->
+    (A -> IO B) -> IO A -> IO B;
+chainIO =
+    \A: Type.
+    \B: Type.
+    \f: A -> IO B.
+    \io: IO A.
+    \world: World.
+    unpackIO A (io world) (Pair B World) f;
+
+printMaybeString: Maybe String -> IO Unit;
+printMaybeString =
+    \maybe: Maybe String.
+    unwrap String maybe (IO Unit)
+        printString
+        (pure Unit unit);
+
+readEntireFile: String -> IO (Maybe String);
+readEntireFile =
+    \path: String.
+    
+    chainIOMaybe File String readFile
+        (openFile path);
+
+printContents: String -> IO Unit;
+printContents =
+    \path: String.
+
+    chainIO (Maybe String) Unit
+        printMaybeString
+        (readEntireFile path);
+ 
+thisPath: String;
+
+main: IO Unit;
+main = printContents thisPath;
+
+
