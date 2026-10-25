@@ -1,0 +1,138 @@
+
+IsFile: Type -> Type;
+
+String: Type;
+
+Maybe: Type -> Type;
+
+nothing: (Value: Type) -> Maybe Value;
+
+matchOnMaybe:
+    (Value: Type) ->
+    (maybe: Maybe Value) ->
+
+    (Result: Type) ->
+    (onJust: Value -> Result) ->
+    (onNothing: Result) ->
+
+    Result;
+
+Exists:
+    (Value: Type) ->
+    (Predicate: Value -> Type) ->
+    Type;
+
+matchOnExists:
+    (Value: Type) ->
+    (Predicate: Value -> Type) ->
+    Exists Value Predicate ->
+
+    (Result: Type) ->
+
+    ((value: Value) -> (proof: Predicate value) ->
+        Result) ->
+        
+    Result;
+
+Pair: Type -> Type -> Type;
+Pair =
+    \Left: Type.
+    \Right: Type.
+
+    Exists Left (\value: Left. Right);
+
+matchOnPair:
+    (Left: Type) ->
+    (Right: Type) ->
+    (pair: Pair Left Right) ->
+
+    (Result: Type) ->
+    (extract: Left -> Right -> Result) ->
+    Result;
+
+matchOnPair =
+    \Left: Type.
+    \Right: Type.
+
+    matchOnExists Left (\value: Left. Right);
+
+FilePredicate: Type -> Type;
+FilePredicate =
+    \Handle: Type.
+    Pair (IsFile Handle) Handle;
+
+File: Type;
+File = Exists Type FilePredicate;
+
+matchOnFile:
+    File ->
+    (Result: Type) ->
+
+    ((Handle: Type) -> (proof: IsFile Handle) -> (handle: Handle) ->
+        Result) ->
+
+    Result;
+
+matchOnFile =
+    \file: File.
+    \Result: Type.
+    \return: (Handle: Type) -> IsFile Handle -> Handle -> Result.
+
+    matchOnExists = matchOnExists Type FilePredicate;
+    
+    body =
+        \Handle: Type.
+        \handle_with_proof: Pair (IsFile Handle) Handle.
+
+        return = return Handle;
+        matchOnPair = matchOnPair (IsFile Handle) Handle;
+
+        return_result =
+            \proof: IsFile Handle.
+            \handle: Handle.
+
+            return proof handle;
+
+        matchOnPair handle_with_proof Result
+            return_result;
+
+    matchOnExists file Result body;
+
+openFile: String -> Maybe File;
+readFile: (S: Type) -> IsFile S -> S -> Maybe String;
+
+Unit: Type;
+
+printString: String -> Unit;
+pure: Unit;
+
+readEntireFile: String -> Maybe String;
+readEntireFile =
+    matchOnMaybe = matchOnMaybe File;
+
+    \path: String.
+    
+    result = openFile path;
+
+    opened =
+        \file: File.
+        matchOnFile file (Maybe String) readFile;
+
+    matchOnMaybe result (Maybe String) opened (nothing String);
+
+printContents: String -> Unit;
+printContents =
+    \path: String.
+
+    content = readEntireFile path;
+ 
+    matchOnMaybe String content Unit
+        printString
+        pure;
+
+thisPath: String;
+
+main: Unit;
+main = printContents thisPath;
+
+
